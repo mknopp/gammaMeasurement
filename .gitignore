@@ -1,0 +1,8 @@
+.dep/
+gammaMeasurement.eep
+gammaMeasurement.elf
+gammaMeasurement.hex
+gammaMeasurement.lss
+gammaMeasurement.map
+gammaMeasurement.sym
+obj/
