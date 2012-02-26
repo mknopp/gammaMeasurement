@@ -73,7 +73,13 @@ void print(char *text);
 int main(void) {
 	char numberBuffer[5];
 
-	// Enable Pin Change Interrupt on Port A, disable Port B IRQ and INT0
+	// Reset all ports to unused state (input, pull-up enabled)
+	DDRA = 0;
+	DDRB = 0;
+	PORTA = (1<<PA7)|(1<<PA6)|(1<<PA5)|(1<<PA4)|(1<<PA3)|(1<<PA2)|(1<<PA1)|(1<<PA0);
+	PORTB = (1<<PB7)|(1<<PB6)|(1<<PB5)|(1<<PB4)|(1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0);
+
+	// Setup interrupt mask: Pin Change on port A, disable pin change on port B and disable ext. INT0
 	GIMSK = PCIE1;
 
 	USI_UART_Flush_Buffers();
