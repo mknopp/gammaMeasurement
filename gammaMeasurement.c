@@ -7,8 +7,8 @@
  * The second task is the measurement of absolute air pressure using a
  * MPX4115A sensor by Freescale Semiconductors which is also included in
  * the output on the UART. Note that the measured air pressure is not altitude
- * compensated and needs to be done on the host computer (no need to reflash the
- * microcontroller when changing location)
+ * compensated and needs to be recalculated on the host computer (no need to
+ * reflash the microcontroller when changing location)
  *
  * Copyright 2011 Martin Knopp
  *
@@ -29,76 +29,107 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/atomic.h>
 #include <util/delay.h>
 
-#include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include "USI_UART.h"
 
-/* Function definitions */
+/**** Variables ****/
+// Prototype for Monitor 414 status bits
+typedef union {
+	uint8_t allFlags;
+
+	struct {
+		uint8_t spare7 :1,
+				spare6 :1,
+				spare5 :1,
+				spare4 :1,
+				spare3 :1,
+				spare2 :1,
+				spare1 :1,
+				spare0 :1;
+	};
+} StatusFlags;
+
+volatile uint16_t gammaDose = 0;
+
+
+/**** Function definitions ****/
+//! Initialize a/d converter
 void ADC_Init(void);
+//! Make one 12 bit a/d conversion and return result
 uint16_t ADC_Read(void);
-static int uart_putchar(char c, FILE *stream);
+// OS_main saves 30 bytes, because main() will never return
 int main(void) __attribute__((OS_main));
+//! Send \param text on serial interface
+void print(char *text);
 
-/* Small wrapper function to allow printf and friends */
-static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL, _FDEV_SETUP_WRITE);
 
-static int uart_putchar(char c, FILE *stream) {
-	USI_UART_Transmit_Byte(c);
-
-	return 0;
-}
-
+/**** Actual program ****/
 int main(void) {
+	char numberBuffer[5];
+
+	// Enable Pin Change Interrupt on Port A, disable Port B IRQ and INT0
+	GIMSK = PCIE1;
+
 	USI_UART_Flush_Buffers();
 	ADC_Init();
 
-	stdout = &mystdout;
+	while (1) {
+		uint16_t airPressure;
 
-	while(1) {
-		uint8_t hByte, lByte;
-		ADCSR |= (1 << ADSC); // Starte Konvertierung
+		airPressure = ADC_Read();
+		print(utoa(airPressure, numberBuffer, 10));
+		print("\n");
 
-		while (ADCSR & (1 << ADSC)); // Warte auf Konvertierung
-
-		lByte = ADCL;
-		hByte = ADCH;
-
-		printf("Hallo, Welt\n");
-
-/*		USI_UART_Transmit_Byte(hByte);
-		USI_UART_Transmit_Byte(lByte);
-		for (int i=0; i<5; ++i)
-			USI_UART_Transmit_Byte(0);
-*/
 		_delay_ms(2000);
 	}
 }
 
 void ADC_Init() {
-	uint16_t result;
+	volatile uint8_t temp;
 
 	ADMUX = 0; // Referenz: AVCC, right-aligned, ADC0
 	ADCSR = (1 << ADEN) | (1 << ADSC) | (0 << ADFR) | (0 << ADIE);
 
-	while (ADCSR & (1 << ADSC)); // warte erste Konvertierung ab
+	while (ADCSR & (1 << ADSC))
+		; // warte erste Konvertierung ab
 
-	result = ADCL;
-	result = result << 8;
-	result |= ADCH;
+	temp = ADCL;
+	temp = ADCH;
 }
 
 uint16_t ADC_Read() {
-	uint16_t result;
+	uint16_t result, temp;
 
 	ADCSR |= (1 << ADSC); // Starte Konvertierung
 
-	while (ADCSR & (1 << ADSC)); // Warte auf Konvertierung
+	while (ADCSR & (1 << ADSC))
+		; // Warte auf Konvertierung
 
-	result = ADCL;
+	temp = ADCL;
+	result = ADCH;
 	result = result << 8;
-	result |= ADCH;
-
+	result |= temp;
 	return result;
+}
+
+void print(char *text) {
+	char *temp = text;
+
+	while (*temp) {
+		USI_UART_Transmit_Byte(*temp);
+		++temp;
+	}
+}
+
+// Interrupt handler for signals from Monitor 414 unit (count, save, alarm)
+ISR(IO_PINS_vect) {
+	static StatusFlags status = {0};
+
+
 }

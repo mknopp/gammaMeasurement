@@ -224,7 +224,8 @@ SCANF_LIB =
 #SCANF_LIB = $(SCANF_LIB_FLOAT)
 
 
-MATH_LIB = -lm
+MATH_LIB =
+#MATH_LIB = -lm
 
 
 
@@ -382,7 +383,8 @@ ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
 
 
 # Default target.
-all: begin gccversion sizebefore build sizeafter end
+#all: begin gccversion sizebefore build sizeafter end
+all: begin build end
 
 # Change the build target to build a HEX file or a library.
 build: elf hex eep lss sym
@@ -415,6 +417,7 @@ end:
 # Display size of file.
 HEXSIZE = $(SIZE) --target=$(FORMAT) $(TARGET).hex
 ELFSIZE = $(SIZE) -A $(TARGET).elf
+AVRSIZE = $(SIZE) -C --mcu $(MCU) $(TARGET).elf
 AVRMEM = avr-mem.sh $(TARGET).elf $(MCU)
 
 sizebefore:
@@ -425,7 +428,8 @@ sizeafter:
 	@if test -f $(TARGET).elf; then echo; echo $(MSG_SIZE_AFTER); $(ELFSIZE); \
 	$(AVRMEM) 2>/dev/null; echo; fi
 
-
+size:
+	@if test -f $(TARGET).elf; then echo; $(AVRSIZE); fi
 
 # Display compiler version information.
 gccversion : 
