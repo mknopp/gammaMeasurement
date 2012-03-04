@@ -44,9 +44,9 @@ typedef union {
 	uint8_t allFlags;
 
 	struct {
-		uint8_t spare7 :1,
-				spare6 :1,
-				spare5 :1,
+		uint8_t prevCount :1,
+				prevSave :1,
+				prevAlarm :1,
 				spare4 :1,
 				spare3 :1,
 				spare2 :1,
@@ -137,5 +137,35 @@ void print(char *text) {
 ISR(IO_PINS_vect) {
 	static StatusFlags status = {0};
 
+	// TODO Pin Mapping!
+	uint8_t currCount = PINA & (1<<PINA0);
+	uint8_t currSave = PINA & (1<<PINA1);
+	uint8_t currAlarm = PINA & (1<<PINA2);
 
+	// Boolean status flags for flank detection
+	uint8_t countRise = 0;
+	uint8_t saveRise = 0;
+	uint8_t alarmRise = 0;
+
+	if (status.prevCount == 0 && currCount == 1)
+		countRise = 1;
+	if (status.prevSave == 0 && currSave == 1)
+		saveRise = 1;
+	if (status.prevAlarm == 0 && currAlarm == 1)
+		alarmRise = 1;
+
+	if (countRise)
+		++gammaDose;
+
+	if (saveRise)
+		// TODO tell main()
+		nop();
+
+	if (alarmRise)
+		// TODO alarm?
+		nop();
+
+	status.prevCount = currCount;
+	status.prevSave = currSave;
+	status.prevAlarm = currAlarm;
 }
