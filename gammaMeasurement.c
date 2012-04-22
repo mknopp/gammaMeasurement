@@ -56,6 +56,7 @@ typedef union {
 } StatusFlags;
 
 volatile uint16_t gammaDose = 0;
+volatile uint8_t transmitData = 0;
 
 
 /**** Function definitions ****/
@@ -71,28 +72,62 @@ void print(char *text);
 
 /**** Actual program ****/
 int main(void) {
-	char numberBuffer[5];
+	// Disable Analog Comparator
+	ACSR = (1<<ACD);
 
 	// Reset all ports to unused state (input, pull-up enabled)
-	DDRA = 0;
-	DDRB = 0;
 	PORTA = (1<<PA7)|(1<<PA6)|(1<<PA5)|(1<<PA4)|(1<<PA3)|(1<<PA2)|(1<<PA1)|(1<<PA0);
 	PORTB = (1<<PB7)|(1<<PB6)|(1<<PB5)|(1<<PB4)|(1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0);
+	DDRA = (1<<DDA1) | (1<<DDA4) | (1<<DDA5);
+	DDRB = (1<<DDB6);
 
 	// Setup interrupt mask: Pin Change on port A, disable pin change on port B and disable ext. INT0
-	GIMSK = PCIE1;
+	GIMSK = (1<<PCIE1);
 
 	USI_UART_Flush_Buffers();
 	ADC_Init();
 
+	// Enable interrupts
+	sei();
+
+	print("Starting up...\n");
+
+	uint8_t state = 0;
+
 	while (1) {
-		uint16_t airPressure;
+		if (transmitData) {
+			// Disable Pin Change IRQ during UART transmission
+			cli();
+			GIMSK &= ~(1<<PCIE1);
+			sei();
 
-		airPressure = ADC_Read();
-		print(utoa(airPressure, numberBuffer, 10));
-		print("\n");
+			char numberBuffer[6];
 
-		_delay_ms(2000);
+			print(utoa(gammaDose, numberBuffer, 10));
+			gammaDose = 0;
+			print(";");
+
+			uint16_t airPressure = ADC_Read();
+			print(utoa(airPressure, numberBuffer, 10));
+			print("\n");
+
+			transmitData = 0;
+
+			// Reenable Pin Change IRQ
+			cli();
+			GIMSK |= (1<<PCIE1);
+			sei();
+		}
+
+		if (state) {
+			PORTA &= ~(1<<PA5);
+			state = 0;
+		}
+		else {
+			PORTA |= (1<<PA5);
+			state = 1;
+		}
+
 	}
 }
 
@@ -110,7 +145,8 @@ void ADC_Init() {
 }
 
 uint16_t ADC_Read() {
-	uint16_t result, temp;
+	uint8_t temp;
+	uint16_t result;
 
 	ADCSR |= (1 << ADSC); // Starte Konvertierung
 
@@ -137,35 +173,48 @@ void print(char *text) {
 ISR(IO_PINS_vect) {
 	static StatusFlags status = {0};
 
-	// TODO Pin Mapping!
-	uint8_t currCount = PINA & (1<<PINA0);
-	uint8_t currSave = PINA & (1<<PINA1);
-	uint8_t currAlarm = PINA & (1<<PINA2);
+	uint8_t currCount = PINA & (1<<PINA3);
+	uint8_t currSave = PINA & (1<<PINA6);
+//	uint8_t currAlarm = PINA & (1<<PINA7);
 
 	// Boolean status flags for flank detection
 	uint8_t countRise = 0;
 	uint8_t saveRise = 0;
-	uint8_t alarmRise = 0;
+//	uint8_t alarmRise = 0;
 
-	if (status.prevCount == 0 && currCount == 1)
+	if (!status.prevCount && currCount) {
 		countRise = 1;
-	if (status.prevSave == 0 && currSave == 1)
+		currCount = 1;
+	}
+	if (!status.prevSave && currSave) {
 		saveRise = 1;
-	if (status.prevAlarm == 0 && currAlarm == 1)
+		currSave = 1;
+	}
+/*	if (!status.prevAlarm && currAlarm) {
 		alarmRise = 1;
-
-	if (countRise)
+		currAlarm = 1;
+	}
+*/
+	if (countRise) {
+		PORTA |= (1<<PA1);
 		++gammaDose;
+	}
+	else
+		PORTA &= ~(1<<PA1);
 
-	if (saveRise)
-		// TODO tell main()
-		nop();
+	if (saveRise) {
+		PORTA |= (1<<PA4);
+		transmitData = 1;
+	}
+	else
+		PORTA &= ~(1<<PA4);
 
-	if (alarmRise)
+
+//	if (alarmRise)
 		// TODO alarm?
-		nop();
+
 
 	status.prevCount = currCount;
 	status.prevSave = currSave;
-	status.prevAlarm = currAlarm;
+//	status.prevAlarm = currAlarm;
 }

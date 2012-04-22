@@ -186,11 +186,11 @@ ISR(SIG_USI_OVERFLOW)
                 USI_UART_status.ongoing_Transmission_From_Buffer = FALSE; 
                 
                 TCCR0  = (0<<CS02)|(0<<CS01)|(0<<CS00);                 // Stop Timer0.
-                PORTB |=   (1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0);         // Enable pull up on USI DO, DI and SCK pins. (And PB3 because of pin change interrupt)   
+  /*              PORTB |=   (1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0);         // Enable pull up on USI DO, DI and SCK pins. (And PB3 because of pin change interrupt)
                 DDRB  &= ~((1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0));        // Set USI DI, DO and SCK pins as inputs.  
                 USICR  =  0;                                            // Disable USI.
-                GIFR   =  (1<<PCIF);                                    // Clear pin change interrupt flag.
-                GIMSK |=  (1<<PCIE0);                                   // Enable pin change interrupt for PB3:0.
+*///                GIFR   =  (1<<PCIF);                                    // Clear pin change interrupt flag.
+//                GIMSK |=  (1<<PCIE0);                                   // Enable pin change interrupt for PB3:0.
             }
         }
     }
