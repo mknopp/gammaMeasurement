@@ -149,7 +149,7 @@ void USI_UART_Transmit_Byte( unsigned char data )
 
 // The USI Counter Overflow interrupt is used for moving data between memory and the USI data register.
 // The interrupt is used for both transmission and reception.
-ISR(SIG_USI_OVERFLOW)
+ISR(USI_OVF_vect)
 {
     unsigned char tmptail;
     
@@ -197,7 +197,7 @@ ISR(SIG_USI_OVERFLOW)
 }
 
 // Timer0 Overflow interrupt is used to trigger the sampling of signals on the USI ports.
-ISR(SIG_OVERFLOW0)
+ISR(TIMER0_OVF0_vect)
 {
     TCNT0 += TIMER0_SEED;                   // Reload the timer,
                                             // current count is added for timing correction.

@@ -45,8 +45,8 @@ typedef union {
 
 	struct {
 		uint8_t prevCount :1,
-				prevSave :1,
 				prevAlarm :1,
+				spare5 :1,
 				spare4 :1,
 				spare3 :1,
 				spare2 :1,
@@ -73,16 +73,17 @@ void print(char *text);
 /**** Actual program ****/
 int main(void) {
 	// Disable Analog Comparator
-	ACSR = (1<<ACD);
+//	ACSR = (1<<ACD);
 
 	// Reset all ports to unused state (input, pull-up enabled)
 	PORTA = (1<<PA7)|(1<<PA6)|(1<<PA5)|(1<<PA4)|(1<<PA3)|(1<<PA2)|(1<<PA1)|(1<<PA0);
 	PORTB = (1<<PB7)|(1<<PB6)|(1<<PB5)|(1<<PB4)|(1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0);
-	DDRA = (1<<DDA1) | (1<<DDA4) | (1<<DDA5);
-	DDRB = (1<<DDB6);
+	DDRA = (1<<DDA1) | (1<<DDA4) | (1<<DDA5) | (1<<DDA6);
 
-	// Setup interrupt mask: Pin Change on port A, disable pin change on port B and disable ext. INT0
-	GIMSK = (1<<PCIE1);
+	// Configure Interrupt 0 for rising edge
+	MCUCR |= (1<<ISC00)|(1<<ISC01);
+	// Setup interrupt mask: Enable INT0 and Pin Change on port A, disable Pin Change on port B
+	GIMSK = (1<<PCIE1)|(1<<INT0);
 
 	USI_UART_Flush_Buffers();
 	ADC_Init();
@@ -98,7 +99,7 @@ int main(void) {
 		if (transmitData) {
 			// Disable Pin Change IRQ during UART transmission
 			cli();
-			GIMSK &= ~(1<<PCIE1);
+			GIMSK &= ~((1<<PCIE1)|(1<<INT0));
 			sei();
 
 			char numberBuffer[6];
@@ -112,10 +113,11 @@ int main(void) {
 			print("\n");
 
 			transmitData = 0;
+			PORTA &= ~(1<<PA4);
 
 			// Reenable Pin Change IRQ
 			cli();
-			GIMSK |= (1<<PCIE1);
+			GIMSK |= (1<<PCIE1)|(1<<INT0);
 			sei();
 		}
 
@@ -169,31 +171,21 @@ void print(char *text) {
 	}
 }
 
-// Interrupt handler for signals from Monitor 414 unit (count, save, alarm)
+// Interrupt handler for count and alarm signals from Monitor 414 unit
 ISR(IO_PINS_vect) {
 	static StatusFlags status = {0};
 
-	uint8_t currCount = PINA & (1<<PINA3);
-	uint8_t currSave = PINA & (1<<PINA6);
-//	uint8_t currAlarm = PINA & (1<<PINA7);
+	uint8_t currCount = (PINA & (1<<PINA3)) >> PINA3;
+//	uint8_t currAlarm = (PINA & (1<<PINA7)) >> PINA7;
 
 	// Boolean status flags for flank detection
 	uint8_t countRise = 0;
-	uint8_t saveRise = 0;
 //	uint8_t alarmRise = 0;
 
-	if (!status.prevCount && currCount) {
+	if (!status.prevCount && currCount)
 		countRise = 1;
-		currCount = 1;
-	}
-	if (!status.prevSave && currSave) {
-		saveRise = 1;
-		currSave = 1;
-	}
-/*	if (!status.prevAlarm && currAlarm) {
+/*	if (!status.prevAlarm && currAlarm)
 		alarmRise = 1;
-		currAlarm = 1;
-	}
 */
 	if (countRise) {
 		PORTA |= (1<<PA1);
@@ -202,19 +194,16 @@ ISR(IO_PINS_vect) {
 	else
 		PORTA &= ~(1<<PA1);
 
-	if (saveRise) {
-		PORTA |= (1<<PA4);
-		transmitData = 1;
-	}
-	else
-		PORTA &= ~(1<<PA4);
-
-
 //	if (alarmRise)
 		// TODO alarm?
 
 
 	status.prevCount = currCount;
-	status.prevSave = currSave;
 //	status.prevAlarm = currAlarm;
+}
+
+// Interrupt handler for save signal from Monitor 414 unit
+ISR(INT0_vect) {
+	PORTA |= (1<<PA4);
+	transmitData = 1;
 }
