@@ -55,6 +55,21 @@ typedef union {
 	};
 } StatusFlags;
 
+// Referenzpunkte Abgeglichen mit HMO2024
+#define AdcRawH 3132												// Stützpunkt 3.88 Volt
+#define AdcRawL   28												// Stützpunkt 0.04 Volt
+
+// Skalierung Delta ADC + Referenzpunkte
+#define RefA 38400.0												// Referenzpunkt A 2V-0.4V=1.6V
+#define RefB   400.0												// Referenzpunkt B 0.4V
+#define Scale 65536													// zur Basis 2^16
+
+// Berechnung der ADC Korrekturwerte mittels Referenzpunkte
+#define Slope  (RefA / (AdcRawH - AdcRawL))							// Delta U / Delta ADC -> Steigung
+#define Offset (uint32_t) ((RefB - (AdcRawL * Slope)) * Scale)		// Offset zur Basis 2^16
+#define Factor (uint32_t) ((RefA / (AdcRawH - AdcRawL)) * Scale)	// Steigung zur Basis 2^16
+
+
 volatile uint16_t gammaDose = 0;
 volatile uint8_t transmitData = 0;
 
@@ -147,19 +162,19 @@ void ADC_Init() {
 }
 
 uint16_t ADC_Read() {
-	uint8_t temp;
-	uint16_t result;
+	uint16_t AvgCount;
+	uint32_t AvgSum = 0;
 
-	ADCSR |= (1 << ADSC); // Starte Konvertierung
 
-	while (ADCSR & (1 << ADSC))
-		; // Warte auf Konvertierung
+	for (AvgCount = 0; AvgCount < 512; AvgCount++) {
+		ADCSR |= (1 << ADSC); // Starte Konvertierung
 
-	temp = ADCL;
-	result = ADCH;
-	result = result << 8;
-	result |= temp;
-	return result;
+		while (ADCSR & (1 << ADSC))
+			; // Warte auf Konvertierung
+		AvgSum += ADC;
+	}
+
+	return ((((AvgSum >> 7) * Factor) + Offset) >> 16);
 }
 
 void print(char *text) {
