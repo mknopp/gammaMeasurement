@@ -55,21 +55,6 @@ typedef union {
 	};
 } StatusFlags;
 
-// Referenzpunkte Abgeglichen mit HMO2024
-#define AdcRawH 3132												// Stützpunkt 3.88 Volt
-#define AdcRawL   28												// Stützpunkt 0.04 Volt
-
-// Skalierung Delta ADC + Referenzpunkte
-#define RefA 38400.0												// Referenzpunkt A 2V-0.4V=1.6V
-#define RefB   400.0												// Referenzpunkt B 0.4V
-#define Scale 65536													// zur Basis 2^16
-
-// Berechnung der ADC Korrekturwerte mittels Referenzpunkte
-#define Slope  (RefA / (AdcRawH - AdcRawL))							// Delta U / Delta ADC -> Steigung
-#define Offset (uint32_t) ((RefB - (AdcRawL * Slope)) * Scale)		// Offset zur Basis 2^16
-#define Factor (uint32_t) ((RefA / (AdcRawH - AdcRawL)) * Scale)	// Steigung zur Basis 2^16
-
-
 volatile uint16_t gammaDose = 0;
 volatile uint8_t transmitData = 0;
 
@@ -87,13 +72,9 @@ void print(char *text);
 
 /**** Actual program ****/
 int main(void) {
-	// Disable Analog Comparator
-//	ACSR = (1<<ACD);
-
-	// Reset all ports to unused state (input, pull-up enabled)
+	// Enable pull-up on all pins
 	PORTA = (1<<PA7)|(1<<PA6)|(1<<PA5)|(1<<PA4)|(1<<PA3)|(1<<PA2)|(1<<PA1)|(1<<PA0);
 	PORTB = (1<<PB7)|(1<<PB6)|(1<<PB5)|(1<<PB4)|(1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0);
-	DDRA = (1<<DDA1) | (1<<DDA4) | (1<<DDA5) | (1<<DDA6);
 
 	// Configure Interrupt 0 for rising edge
 	MCUCR |= (1<<ISC00)|(1<<ISC01);
@@ -103,12 +84,10 @@ int main(void) {
 	USI_UART_Flush_Buffers();
 	ADC_Init();
 
-	// Enable interrupts
-	sei();
-
 	print("Starting up...\n");
 
-	uint8_t state = 0;
+	// Enable interrupts
+	sei();
 
 	while (1) {
 		if (transmitData) {
@@ -123,58 +102,50 @@ int main(void) {
 			gammaDose = 0;
 			print(";");
 
-			uint16_t airPressure = ADC_Read();
+			// Average over 512 readings and treat result as 12bit
+			uint32_t airPressure = 0;
+			for (uint16_t i=0; i<512; ++i) {
+				airPressure += ADC_Read();
+			}
+			airPressure = airPressure >> 7;
+
 			print(utoa(airPressure, numberBuffer, 10));
 			print("\n");
 
 			transmitData = 0;
-			PORTA &= ~(1<<PA4);
 
 			// Reenable Pin Change IRQ
 			cli();
 			GIMSK |= (1<<PCIE1)|(1<<INT0);
 			sei();
 		}
-
-		if (state) {
-			PORTA &= ~(1<<PA5);
-			state = 0;
-		}
-		else {
-			PORTA |= (1<<PA5);
-			state = 1;
-		}
-
 	}
 }
 
 void ADC_Init() {
-	volatile uint8_t temp;
+	ADMUX = (1 << REFS1) | // Ref: int 2.56V
+			(0 << REFS0) | // AREF not connected
+			(0 << ADLAR) | // right adjusted
+			(0 << MUX4) | // Diff: ADC0 - ADC1, 1x gain
+			(1 << MUX3) |
+			(1 << MUX2) |
+			(0 << MUX1) |
+			(0 << MUX0);
+	ADCSR = (1 << ADEN) | // Enable ADC
+			(1 << ADSC) | // Start conversion
+			(0 << ADFR) | // Disable free running mode, only convert on demand
+			(0 << ADIE) | // Disable ADC interrupt
+			(1 << ADPS2) | // Set prescaler to 128
+			(1 << ADPS1) | // -> 115.2 kHz sample rate
+			(1 << ADPS0);  // Should be between 50 and 200 kHz
 
-	ADMUX = 0; // Referenz: AVCC, right-aligned, ADC0
-	ADCSR = (1 << ADEN) | (1 << ADSC) | (0 << ADFR) | (0 << ADIE);
-
-	while (ADCSR & (1 << ADSC))
-		; // warte erste Konvertierung ab
-
-	temp = ADCL;
-	temp = ADCH;
+	while (ADCSR & (1 << ADSC)); // Wait for first conversion
 }
 
 uint16_t ADC_Read() {
-	uint16_t AvgCount;
-	uint32_t AvgSum = 0;
-
-
-	for (AvgCount = 0; AvgCount < 512; AvgCount++) {
-		ADCSR |= (1 << ADSC); // Starte Konvertierung
-
-		while (ADCSR & (1 << ADSC))
-			; // Warte auf Konvertierung
-		AvgSum += ADC;
-	}
-
-	return ((((AvgSum >> 7) * Factor) + Offset) >> 16);
+	ADCSR |= (1 << ADSC); // Start conversion
+	while (ADCSR & (1 << ADSC)); // Wait for conversion
+	return ADC;
 }
 
 void print(char *text) {
@@ -203,11 +174,8 @@ ISR(IO_PINS_vect) {
 		alarmRise = 1;
 */
 	if (countRise) {
-		PORTA |= (1<<PA1);
 		++gammaDose;
 	}
-	else
-		PORTA &= ~(1<<PA1);
 
 //	if (alarmRise)
 		// TODO alarm?
@@ -219,6 +187,5 @@ ISR(IO_PINS_vect) {
 
 // Interrupt handler for save signal from Monitor 414 unit
 ISR(INT0_vect) {
-	PORTA |= (1<<PA4);
 	transmitData = 1;
 }
