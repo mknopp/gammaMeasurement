@@ -96,7 +96,7 @@ int main(void) {
 			GIMSK &= ~((1<<PCIE1)|(1<<INT0));
 			sei();
 
-			char numberBuffer[6];
+			char numberBuffer[11];
 
 			print(utoa(gammaDose, numberBuffer, 10));
 			gammaDose = 0;
@@ -109,8 +109,8 @@ int main(void) {
 			}
 			airPressure = airPressure >> 7;
 
-			print(utoa(airPressure, numberBuffer, 10));
-			print("\n");
+			print(ultoa(airPressure, numberBuffer, 10));
+			print("\r\n");
 
 			transmitData = 0;
 
