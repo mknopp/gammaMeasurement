@@ -72,8 +72,9 @@ void print(char *text);
 
 /**** Actual program ****/
 int main(void) {
+	// Enable pull-up on all non-analog-pins
+	PORTA = (1<<PA7)|(1<<PA6)|(1<<PA5)|(1<<PA4)|(0<<PA3)|(1<<PA2)|(0<<PA1)|(0<<PA0);
 	// Enable pull-up on all pins
-	PORTA = (1<<PA7)|(1<<PA6)|(1<<PA5)|(1<<PA4)|(1<<PA3)|(1<<PA2)|(1<<PA1)|(1<<PA0);
 	PORTB = (1<<PB7)|(1<<PB6)|(1<<PB5)|(1<<PB4)|(1<<PB3)|(1<<PB2)|(1<<PB1)|(1<<PB0);
 
 	// Configure Interrupt 0 for rising edge
@@ -124,7 +125,7 @@ int main(void) {
 
 void ADC_Init() {
 	ADMUX = (1 << REFS1) | // Ref: int 2.56V
-			(0 << REFS0) | // AREF not connected
+			(1 << REFS0) | // AREF 100nF to GND
 			(0 << ADLAR) | // right adjusted
 			(0 << MUX4) | // Diff: ADC0 - ADC1, 1x gain
 			(1 << MUX3) |
@@ -161,7 +162,7 @@ void print(char *text) {
 ISR(IO_PINS_vect) {
 	static StatusFlags status = {0};
 
-	uint8_t currCount = (PINA & (1<<PINA3)) >> PINA3;
+	uint8_t currCount = (PINA & (1<<PINA6)) >> PINA6;
 //	uint8_t currAlarm = (PINA & (1<<PINA7)) >> PINA7;
 
 	// Boolean status flags for flank detection
