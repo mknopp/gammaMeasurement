@@ -57,6 +57,7 @@ typedef union {
 
 volatile uint16_t gammaDose = 0;
 volatile uint8_t transmitData = 0;
+volatile uint8_t alarm = 0;
 
 
 /**** Function definitions ****/
@@ -72,6 +73,8 @@ void print(char *text);
 
 /**** Actual program ****/
 int main(void) {
+	// Disable analog comparator, we need PA6 and PA7 for IRQs from the Monitor unit
+	ACSR = (1<<ACD);
 	// Enable pull-up on all non-analog-pins
 	PORTA = (1<<PA7)|(1<<PA6)|(1<<PA5)|(1<<PA4)|(0<<PA3)|(1<<PA2)|(0<<PA1)|(0<<PA0);
 	// Enable pull-up on all pins
@@ -111,6 +114,10 @@ int main(void) {
 			airPressure = airPressure >> 7;
 
 			print(ultoa(airPressure, numberBuffer, 10));
+			print(";");
+
+			print(utoa(alarm, numberBuffer, 10));
+			alarm = 0;
 			print("\r\n");
 
 			transmitData = 0;
@@ -163,27 +170,29 @@ ISR(IO_PINS_vect) {
 	static StatusFlags status = {0};
 
 	uint8_t currCount = (PINA & (1<<PINA6)) >> PINA6;
-//	uint8_t currAlarm = (PINA & (1<<PINA7)) >> PINA7;
+	uint8_t currAlarm = (PINA & (1<<PINA7)) >> PINA7;
 
 	// Boolean status flags for flank detection
 	uint8_t countRise = 0;
-//	uint8_t alarmRise = 0;
+	uint8_t alarmRise = 0;
 
 	if (!status.prevCount && currCount)
 		countRise = 1;
-/*	if (!status.prevAlarm && currAlarm)
+	if (!status.prevAlarm && currAlarm)
 		alarmRise = 1;
-*/
+
 	if (countRise) {
 		++gammaDose;
 	}
 
-//	if (alarmRise)
-		// TODO alarm?
+	// Just count the alarms as we only do logging
+	if (alarmRise) {
+		++alarm;
+	}
 
 
 	status.prevCount = currCount;
-//	status.prevAlarm = currAlarm;
+	status.prevAlarm = currAlarm;
 }
 
 // Interrupt handler for save signal from Monitor 414 unit
