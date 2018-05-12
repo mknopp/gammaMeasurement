@@ -1,0 +1,26 @@
+[labels]
+
+MPX4115A
+refdes=U?
+! author=Martin Knopp
+! device=MXP4115A
+! description=Integrated Pressure Sensor
+! footprint=SIP6N
+! numslots=0
+
+[left]
+
+[right]
+1 OUT
+2 GND
+3 VCC
+
+[top]
+
+[bottom]
+
+[nc]
+4
+5
+6
+

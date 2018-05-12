@@ -1,0 +1,49 @@
+v 20060123 1
+B 300 300 1900 1600 3 0 0 0 -1 -1 0 -1 -1 -1 -1 -1
+T 2200 2000 9 10 0 0 0 0 1
+numslots=0
+T 2200 2200 9 10 0 0 0 0 1
+footprint=SIP6N
+T 2200 2400 9 10 0 0 0 0 1
+description=Integrated Pressure Sensor
+T 2200 2600 9 10 0 0 0 0 1
+device=MXP4115A
+T 2200 2800 9 10 0 0 0 0 1
+author=Martin Knopp
+T 1300 1300 9 10 1 1 0 3 1
+MPX4115A
+T 1300 900 9 10 1 1 0 3 1
+refdes=U?
+P 2500 1500 2200 1500 1 0 0
+{
+T 2150 1500 9 10 1 1 0 7 1
+pinlabel=OUT
+T 2300 1550 5 8 1 1 0 0 1
+pinnumber=1
+T 2300 1550 5 8 0 1 0 0 1
+pinseq=1
+T 2100 1550 9 10 0 1 0 6 1
+pintype=pas
+}
+P 2500 1100 2200 1100 1 0 0
+{
+T 2150 1100 9 10 1 1 0 7 1
+pinlabel=GND
+T 2300 1150 5 8 1 1 0 0 1
+pinnumber=2
+T 2300 1150 5 8 0 1 0 0 1
+pinseq=2
+T 2100 1150 9 10 0 1 0 6 1
+pintype=pas
+}
+P 2500 700 2200 700 1 0 0
+{
+T 2150 700 9 10 1 1 0 7 1
+pinlabel=VCC
+T 2300 750 5 8 1 1 0 0 1
+pinnumber=3
+T 2300 750 5 8 0 1 0 0 1
+pinseq=3
+T 2100 750 9 10 0 1 0 6 1
+pintype=pas
+}
